@@ -8,7 +8,10 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -36,12 +39,11 @@ class ZookeeperLockSupporter {
     //等待释放锁被挂起的时间设置为1分钟，1分钟后重新尝试获取锁
     private static final long AWAIT_TIME_OUT_MINS = 1;
 
-    //锁被持有过久，强行干掉的超时时间是1分钟
-    private static final long LOCK_RELEASE_TIME_OUT = 1;
 
-    private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 
-    public ZookeeperLockSupporter(ZooKeeper zooKeeper, String basePath, String lockName) {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ZookeeperLockSupporter.class);
+
+    ZookeeperLockSupporter(ZooKeeper zooKeeper, String basePath, String lockName) {
         this.basePath = basePath;
         this.lockName = lockName;
         this.zooKeeper = zooKeeper;
@@ -186,39 +188,9 @@ class ZookeeperLockSupporter {
         }
     }
 
-    private boolean killAllTimeoutNode(List<String> preNodePaths) {
-        boolean result = false;
-        for (final String tempNodePath : preNodePaths) {
-            Long time = SimpleUtils.asMuchasPossibleRetry(new SimpleUtils.Run<Long>() {
-                @Override
-                public Long run() throws Exception {
-                    byte[] bytes = zooKeeper.getData(getNodeFullPath(tempNodePath), null, null);
-                    if (bytes != null && bytes.length > 0) {
-                        return SimpleUtils.getLong(bytes);
-                    }
-                    return null;
-                }
-            });
-            if (time == null) {
-                continue;
-            }
-            if ((System.currentTimeMillis() - time) > TimeUnit.MINUTES.toMillis(LOCK_RELEASE_TIME_OUT)) {
-                result = true;
-                SimpleUtils.asMuchasPossibleRetry(new SimpleUtils.Run<Void>() {
-                    @Override
-                    public Void run() throws KeeperException, InterruptedException {
-                        zooKeeper.delete(getNodeFullPath(tempNodePath), -1);
-                        return null;
-                    }
-                });
-            }
-        }
-        return result;
-    }
 
-    interface Run<T> {
-        T run() throws Exception;
-    }
+
+
 
     public void releaseLock() {
         if (nodePath == null || !lock) {
@@ -238,19 +210,19 @@ class ZookeeperLockSupporter {
 
     private static class ZookeeperWatcher implements Watcher {
 
-        Map<Event.EventType, Watcher> map;
+        EnumMap<Event.EventType, Watcher> enumMap;
         ZooKeeper zooKeeper;
 
-        public ZookeeperWatcher(ZooKeeper zooKeeper) {
+        ZookeeperWatcher(ZooKeeper zooKeeper) {
             this.zooKeeper = zooKeeper;
-            map = new HashMap<>();
+            enumMap= new EnumMap<>(Event.EventType.class);
         }
 
-        public void addListener(Event.EventType eventType, Watcher watcher) {
+        void addListener(Event.EventType eventType, Watcher watcher) {
             if (eventType == null || watcher == null) {
                 return;
             }
-            map.put(eventType, watcher);
+            enumMap.put(eventType, watcher);
         }
 
         public interface Watcher {
@@ -260,8 +232,8 @@ class ZookeeperLockSupporter {
         @Override
         public void process(WatchedEvent event) {
             Event.EventType eventType = event.getType();
-            if (map.containsKey(eventType)) {
-                map.get(eventType).process(event);
+            if (enumMap.containsKey(eventType)) {
+                enumMap.get(eventType).process(event);
             }
             //继续注册
             zooKeeper.register(this);
