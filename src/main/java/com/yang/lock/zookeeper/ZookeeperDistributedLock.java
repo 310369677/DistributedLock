@@ -252,6 +252,7 @@ class ZookeeperDistributedLock implements DistributedLock {
 
     /**
      * 得到当前线程在zookeeper上对应节点的支持者
+     *
      * @return 支持者
      */
     private ZookeeperLockSupporter getCurrentThreadSupporter() {
@@ -269,6 +270,7 @@ class ZookeeperDistributedLock implements DistributedLock {
                 throw new NetWorkException("网络异常");
             }
             //System.out.println(name+"创建节点成功"+path);
+            LOGGER.debug("线程{}对应的节点路径是{}", Thread.currentThread(), path);
             lockSupportorContext.set(supporter);
         }
         return supporter;

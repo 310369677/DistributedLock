@@ -40,14 +40,13 @@ class ZookeeperLockSupporter {
     private static final long AWAIT_TIME_OUT_MINS = 1;
 
 
-
     private static final Logger LOGGER = LoggerFactory.getLogger(ZookeeperLockSupporter.class);
 
     ZookeeperLockSupporter(ZooKeeper zooKeeper, String basePath, String lockName) {
         this.basePath = basePath;
         this.lockName = lockName;
         this.zooKeeper = zooKeeper;
-        this.path = SimpleUtils.pathJoin(basePath,lockName);
+        this.path = SimpleUtils.pathJoin(basePath, lockName);
     }
 
     /**
@@ -171,7 +170,7 @@ class ZookeeperLockSupporter {
                     return zooKeeper.exists(getNodeFullPath(preNodePath), zookeeperWatcher);
                 }
             });
-            //上一个节点不存在,重新去获得锁
+            //上一个节点不存在,可能上个节点的锁已经释放,重新去获得锁
             if (stat1 == null) {
                 continue;
             }
@@ -187,9 +186,6 @@ class ZookeeperLockSupporter {
             }
         }
     }
-
-
-
 
 
     public void releaseLock() {
@@ -215,7 +211,7 @@ class ZookeeperLockSupporter {
 
         ZookeeperWatcher(ZooKeeper zooKeeper) {
             this.zooKeeper = zooKeeper;
-            enumMap= new EnumMap<>(Event.EventType.class);
+            enumMap = new EnumMap<>(Event.EventType.class);
         }
 
         void addListener(Event.EventType eventType, Watcher watcher) {
